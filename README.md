@@ -303,4 +303,4 @@ Este proyecto se distribuye bajo la licencia **MIT**.
 
 ## Autor
 
-**pcbecom** — pendiente de asignar.
+**pcbecom** — PCBTroniks
