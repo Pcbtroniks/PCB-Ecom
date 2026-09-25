@@ -15,7 +15,7 @@
 
 ## Acerca del proyecto
 
-**pcbecom** es una tienda en línea que consume el catálogo de **SYSCOM** (distribuidor mexicano de productos electrónicos y de redes) para ofrecer a los usuarios un catálogo navegable, carrito persistente, checkout seguro y consulta de pedidos.
+**pcbecom** es una tienda en línea interna que consume el catálogo de **SYSCOM** (distribuidor mexicano de productos electrónicos y de redes) para ofrecer a nuestros clientes un catálogo navegable, carrito persistente, checkout seguro y consulta de pedidos.
 
 La aplicación está pensada como vitrina de storefront: el inventario, precios base y existencias se obtienen en tiempo real desde la API de SYSCOM; pcbecom calcula el precio final aplicando una comisión configurable.
 
