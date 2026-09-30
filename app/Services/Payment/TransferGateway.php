@@ -6,11 +6,23 @@ use App\Models\Order;
 
 class TransferGateway implements PaymentGateway
 {
+    /**
+     * Identificador del gateway de transferencia bancaria.
+     *
+     * @return string 'transfer'.
+     */
     public function name(): string
     {
         return 'transfer';
     }
 
+    /**
+     * Genera las instrucciones de transferencia (CLABE, banco, referencia) como resultado pendiente de pago.
+     *
+     * @param  Order  $order  Orden a pagar.
+     * @param  array  $options  Opciones (no utilizadas).
+     * @return PaymentResult Resultado en estado `awaiting_transfer` con los datos bancarios en `message` y `raw`.
+     */
     public function charge(Order $order, array $options = []): PaymentResult
     {
         $clabe = (string) config('payment.methods.transfer.clabe');
@@ -34,6 +46,12 @@ class TransferGateway implements PaymentGateway
         );
     }
 
+    /**
+     * Devuelve siempre el estado `awaiting_transfer`; la confirmación real llega por webhook.
+     *
+     * @param  string  $paymentIntentId  ID del intento.
+     * @return PaymentResult Resultado en espera de transferencia.
+     */
     public function retrieve(string $paymentIntentId): PaymentResult
     {
         return new PaymentResult(
@@ -43,6 +61,13 @@ class TransferGateway implements PaymentGateway
         );
     }
 
+    /**
+     * Construye un WebhookEvent de tipo `transfer.received` con valores por defecto.
+     *
+     * @param  array  $payload  Cuerpo del webhook.
+     * @param  string|null  $signature  Firma (ignorada).
+     * @return WebhookEvent Evento de transferencia recibida.
+     */
     public function handleWebhook(array $payload, ?string $signature = null): WebhookEvent
     {
         return new WebhookEvent(
