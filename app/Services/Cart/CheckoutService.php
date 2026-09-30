@@ -7,7 +7,6 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\Payment\PaymentGateway;
-use App\Services\Payment\PaymentResult;
 use App\Services\Syscom\CartCheckoutService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,11 +20,28 @@ class CheckoutService
         protected PaymentGateway $gateway,
     ) {}
 
+    /**
+     * Recalcula los totales del carrito para mostrar una vista previa del checkout.
+     *
+     * @param  Cart  $cart  Carrito a previsualizar.
+     * @return Cart Carrito con subtotal, envío, impuesto y total actualizados.
+     */
     public function preview(Cart $cart): Cart
     {
         return $this->pricing->recompute($cart);
     }
 
+    /**
+     * Confirma el checkout: crea la orden en Syscom, persiste Order/OrderItems, intenta el cobro y vacía el carrito.
+     *
+     * @param  Cart  $cart  Carrito origen.
+     * @param  array  $data  Datos de checkout (direcciones, método de pago, notas).
+     * @param  User|null  $user  Usuario autenticado (opcional si el carrito ya lo tiene).
+     * @param  string|null  $idempotencyKey  Clave para deduplicar; si falta se genera una.
+     * @return Order Orden creada (o la existente si la clave ya se usó).
+     *
+     * @throws \RuntimeException Si el carrito está vacío.
+     */
     public function confirm(Cart $cart, array $data, ?User $user = null, ?string $idempotencyKey = null): Order
     {
         $idempotencyKey ??= 'ck_'.Str::random(24);
@@ -93,6 +109,14 @@ class CheckoutService
         });
     }
 
+    /**
+     * Marca la orden como pagada y ajusta el `payment_status` si quedó en estado pagado/procesando.
+     *
+     * @param  Order  $order  Orden a actualizar.
+     * @param  string  $paymentIntentId  ID del intento de pago.
+     * @param  string|null  $status  Estado de pago opcional.
+     * @return Order Orden recargada.
+     */
     public function markPaid(Order $order, string $paymentIntentId, ?string $status = null): Order
     {
         $order->markPaid($paymentIntentId, $status);
@@ -104,6 +128,12 @@ class CheckoutService
         return $order->fresh();
     }
 
+    /**
+     * Busca la orden más reciente asociada a una clave de idempotencia.
+     *
+     * @param  string  $key  Clave de idempotencia (vacía devuelve null).
+     * @return Order|null Orden encontrada o null.
+     */
     public function findIdempotent(string $key): ?Order
     {
         if ($key === '') {
@@ -116,6 +146,12 @@ class CheckoutService
             ->first();
     }
 
+    /**
+     * Intenta cobrar la orden vía el gateway configurado y actualiza sus datos de pago.
+     *
+     * @param  Order  $order  Orden a cobrar.
+     * @param  array  $data  Datos del checkout reenviados al gateway.
+     */
     protected function chargePayment(Order $order, array $data): void
     {
         try {
@@ -141,6 +177,11 @@ class CheckoutService
         }
     }
 
+    /**
+     * Genera un número de orden único con el formato `PCB-AAAA-XXXXXX`.
+     *
+     * @return string Número de orden garantizado único.
+     */
     protected function generateOrderNumber(): string
     {
         $year = now()->format('Y');
