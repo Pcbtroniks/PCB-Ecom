@@ -2,13 +2,17 @@
 
 namespace App\Services\Syscom;
 
-use App\Services\Syscom\DTOs\CategoryDto;
 use Illuminate\Support\Facades\Cache;
 
 class CategoryTreeService
 {
     public function __construct(protected CategoriesService $categories) {}
 
+    /**
+     * Devuelve el árbol jerárquico completo de categorías (con `children`), cacheado por TTL.
+     *
+     * @return array Lista de nodos raíz; cada nodo incluye `children` y `children_ids`.
+     */
     public function getTree(): array
     {
         $ttl = (int) config('syscom.cache.categories_ttl', 86400);
@@ -16,10 +20,16 @@ class CategoryTreeService
 
         return Cache::remember($cacheKey, $ttl, function (): array {
             $flat = $this->categories->getCategories();
+
             return $this->buildTree($flat);
         });
     }
 
+    /**
+     * Devuelve únicamente las categorías raíz del árbol (sin padre).
+     *
+     * @return array Nodos cuyo `parent_id` es null.
+     */
     public function getRoots(): array
     {
         return array_values(array_filter(
@@ -28,6 +38,12 @@ class CategoryTreeService
         ));
     }
 
+    /**
+     * Devuelve la ruta jerárquica desde la raíz hasta la categoría indicada.
+     *
+     * @param  int  $categoryId  ID de la categoría destino.
+     * @return array Lista ordenada de ancestros (incluye la categoría objetivo); vacía si no existe.
+     */
     public function getPath(int $categoryId): array
     {
         $flat = $this->categories->getCategories();
@@ -71,12 +87,25 @@ class CategoryTreeService
         return $path;
     }
 
+    /**
+     * Devuelve los hijos directos de una categoría en el árbol.
+     *
+     * @param  int  $categoryId  ID de la categoría padre.
+     * @return array Subcategorías directas; lista vacía si no tiene hijos.
+     */
     public function getChildren(int $categoryId): array
     {
         $all = $this->getTree();
+
         return array_values(array_filter($all, fn ($c) => (int) ($c['parent_id'] ?? 0) === $categoryId));
     }
 
+    /**
+     * Busca un nodo de categoría en el árbol por su ID.
+     *
+     * @param  int  $id  ID de la categoría.
+     * @return array|null Nodo encontrado o null.
+     */
     public function getCategory(int $id): ?array
     {
         foreach ($this->getTree() as $node) {
@@ -84,9 +113,16 @@ class CategoryTreeService
                 return $node;
             }
         }
+
         return null;
     }
 
+    /**
+     * Construye la estructura jerárquica (con `children`) a partir de la lista plana de categorías.
+     *
+     * @param  array  $flat  Lista plana de categorías con `id`, `nombre` y `nivel`.
+     * @return array Lista de nodos raíz del árbol con sus descendientes anidados.
+     */
     protected function buildTree(array $flat): array
     {
         $nodes = [];
@@ -125,6 +161,15 @@ class CategoryTreeService
         return $tree;
     }
 
+    /**
+     * Infiere el ID de la categoría padre usando el último nodo visto en el nivel superior o coincidencia por prefijo de nombre.
+     *
+     * @param  int  $id  ID de la categoría actual.
+     * @param  int  $nivel  Nivel de la categoría actual.
+     * @param  array  $flat  Lista plana de categorías (referencia).
+     * @param  array  $lastByLevel  Mapa de último ID visto por nivel (se actualiza por referencia).
+     * @return int|null ID del padre inferido o null si es raíz o no se encuentra.
+     */
     protected function inferParent(int $id, int $nivel, array $flat, array $lastByLevel): ?int
     {
         if ($nivel <= 1) {
@@ -167,6 +212,14 @@ class CategoryTreeService
         return $bestMatch;
     }
 
+    /**
+     * Variante de inferencia de padre basada solo en coincidencia de prefijo de nombre; actualmente sin uso externo.
+     *
+     * @param  int  $childId  ID de la categoría hija.
+     * @param  array  $flat  Lista plana de categorías.
+     * @param  array  $byId  Mapa de categorías indexado por ID.
+     * @return int|null ID del padre inferido o null.
+     */
     protected function findParentId(int $childId, array $flat, array $byId): ?int
     {
         $child = $byId[$childId] ?? null;
@@ -190,6 +243,7 @@ class CategoryTreeService
                 $bestLen = mb_strlen($candidateName);
             }
         }
+
         return $bestMatch;
     }
 }
