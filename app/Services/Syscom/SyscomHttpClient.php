@@ -19,26 +19,65 @@ class SyscomHttpClient
         protected string $baseUrl,
     ) {}
 
+    /**
+     * Ejecuta una petición GET al API de Syscom.
+     *
+     * @param  string  $path  Endpoint relativo (ej. `productos`).
+     * @param  array  $query  Parámetros de query string.
+     * @return array Cuerpo JSON decodificado.
+     */
     public function get(string $path, array $query = []): array
     {
         return $this->request('GET', $path, query: $query);
     }
 
+    /**
+     * Ejecuta una petición POST al API de Syscom con cuerpo JSON.
+     *
+     * @param  string  $path  Endpoint relativo.
+     * @param  array  $json  Cuerpo a enviar como JSON.
+     * @return array Cuerpo JSON decodificado.
+     */
     public function post(string $path, array $json = []): array
     {
         return $this->request('POST', $path, json: $json);
     }
 
+    /**
+     * Ejecuta una petición PUT al API de Syscom con cuerpo JSON.
+     *
+     * @param  string  $path  Endpoint relativo.
+     * @param  array  $json  Cuerpo a enviar como JSON.
+     * @return array Cuerpo JSON decodificado.
+     */
     public function put(string $path, array $json = []): array
     {
         return $this->request('PUT', $path, json: $json);
     }
 
+    /**
+     * Ejecuta una petición DELETE al API de Syscom.
+     *
+     * @param  string  $path  Endpoint relativo.
+     * @param  array  $query  Parámetros de query string.
+     * @return array Cuerpo JSON decodificado.
+     */
     public function delete(string $path, array $query = []): array
     {
         return $this->request('DELETE', $path, query: $query);
     }
 
+    /**
+     * Lógica común: envía la petición con token, maneja 401 (refresca token), 429 (espera Retry-After) y reintenta con backoff.
+     *
+     * @param  string  $method  Verbo HTTP en mayúsculas.
+     * @param  string  $path  Endpoint relativo.
+     * @param  array  $query  Parámetros de query string.
+     * @param  array  $json  Cuerpo JSON (solo para POST/PUT).
+     * @return array Cuerpo JSON decodificado.
+     *
+     * @throws RuntimeException Si se agotan los reintentos o la API devuelve un error no recuperable.
+     */
     protected function request(string $method, string $path, array $query = [], array $json = []): array
     {
         $url = $this->buildUrl($path);
@@ -59,6 +98,7 @@ class SyscomHttpClient
                 if ($response->status() === 401) {
                     $this->tokenCache->forget();
                     $this->cachedToken = null;
+
                     continue;
                 }
 
@@ -70,11 +110,13 @@ class SyscomHttpClient
                         'attempt' => $attempts,
                     ]);
                     $this->sleepBackoff($retryAfter * 1000, $attempts);
+
                     continue;
                 }
 
                 if ($response->serverError() && $attempts < $maxAttempts) {
                     $this->sleepBackoff($sleepMs, $attempts);
+
                     continue;
                 }
 
@@ -93,6 +135,7 @@ class SyscomHttpClient
                 $lastError = $e;
                 if ($attempts < $maxAttempts) {
                     $this->sleepBackoff($sleepMs, $attempts);
+
                     continue;
                 }
                 break;
@@ -100,6 +143,7 @@ class SyscomHttpClient
                 $lastError = $e;
                 if ($attempts < $maxAttempts) {
                     $this->sleepBackoff($sleepMs, $attempts);
+
                     continue;
                 }
                 break;
@@ -118,6 +162,11 @@ class SyscomHttpClient
         );
     }
 
+    /**
+     * Devuelve el token de acceso cacheado en memoria, solicitándolo al TokenCache si aún no se cargó.
+     *
+     * @return string Token Bearer listo para enviar en `Authorization`.
+     */
     protected function getToken(): string
     {
         if (is_string($this->cachedToken) && $this->cachedToken !== '') {
@@ -127,6 +176,13 @@ class SyscomHttpClient
         return $this->cachedToken = $this->tokenCache->get();
     }
 
+    /**
+     * Construye el cliente HTTP con token Bearer, cabeceras JSON y timeouts; añade el cuerpo si se proporciona.
+     *
+     * @param  string  $token  Token de acceso.
+     * @param  array  $json  Cuerpo JSON a serializar (vacío = sin body).
+     * @return PendingRequest Cliente listo para ejecutar el verbo HTTP.
+     */
     protected function buildRequest(string $token, array $json): PendingRequest
     {
         $request = Http::withToken($token)
@@ -144,13 +200,26 @@ class SyscomHttpClient
         return $request;
     }
 
+    /**
+     * Une la URL base y el path en una sola URL absoluta, normalizando las barras.
+     *
+     * @param  string  $path  Endpoint relativo.
+     * @return string URL completa sin slash duplicado.
+     */
     protected function buildUrl(string $path): string
     {
         $base = rtrim($this->baseUrl, '/');
         $path = ltrim($path, '/');
+
         return $base.'/'.$path;
     }
 
+    /**
+     * Mapea un verbo HTTP en mayúsculas al nombre de método correspondiente en el HTTP client.
+     *
+     * @param  string  $method  Verbo HTTP (GET, POST, PUT, DELETE, PATCH).
+     * @return string Nombre del método del cliente HTTP en minúsculas.
+     */
     protected function httpMethod(string $method): string
     {
         return match ($method) {
@@ -163,6 +232,12 @@ class SyscomHttpClient
         };
     }
 
+    /**
+     * Duerme el proceso aplicando backoff exponencial con jitter aleatorio entre intentos.
+     *
+     * @param  int  $baseMs  Milisegundos base del retardo.
+     * @param  int  $attempt  Número de intento actual (1-based).
+     */
     protected function sleepBackoff(int $baseMs, int $attempt): void
     {
         $jitter = random_int(0, max(1, (int) ($baseMs / 2)));

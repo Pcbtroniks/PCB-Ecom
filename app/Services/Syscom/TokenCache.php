@@ -14,6 +14,11 @@ class TokenCache
         protected int $safetyMarginSeconds = 60,
     ) {}
 
+    /**
+     * Devuelve el token OAuth cacheado, o lo obtiene y cachea si está vencido o ausente.
+     *
+     * @return string Token Bearer válido.
+     */
     public function get(): string
     {
         $token = Cache::get($this->cacheKey);
@@ -25,11 +30,21 @@ class TokenCache
         return $this->refresh();
     }
 
+    /**
+     * Invalida el token cacheado para forzar un refresh en el próximo `get()`.
+     */
     public function forget(): void
     {
         Cache::forget($this->cacheKey);
     }
 
+    /**
+     * Solicita un nuevo token vía OAuth client_credentials y lo guarda en caché con margen de seguridad.
+     *
+     * @return string Token recién emitido.
+     *
+     * @throws RuntimeException Si las credenciales no están configuradas o la respuesta es inválida.
+     */
     protected function refresh(): string
     {
         $oauthUrl = (string) config('syscom.oauth_url');
