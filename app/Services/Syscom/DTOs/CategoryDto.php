@@ -10,6 +10,12 @@ class CategoryDto
         public readonly string $nombre,
     ) {}
 
+    /**
+     * Construye un CategoryDto desde un arreglo asociativo de la API Syscom.
+     *
+     * @param  array  $data  Arreglo con claves `id`, `nivel` (opcional) y `nombre`.
+     * @return self DTO con los valores normalizados.
+     */
     public static function fromArray(array $data): self
     {
         return new self(
@@ -19,6 +25,11 @@ class CategoryDto
         );
     }
 
+    /**
+     * Serializa el DTO a un arreglo asociativo.
+     *
+     * @return array Arreglo con `id`, `nivel` y `nombre`.
+     */
     public function toArray(): array
     {
         return [

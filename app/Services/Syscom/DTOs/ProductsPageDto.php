@@ -12,6 +12,12 @@ class ProductsPageDto
         public readonly bool $todo,
     ) {}
 
+    /**
+     * Construye un ProductsPageDto desde un arreglo de respuesta paginada de la API Syscom.
+     *
+     * @param  array  $data  Arreglo con claves `cantidad`, `pagina`, `paginas`, `productos` y `todo`.
+     * @return self DTO con cada producto convertido a ProductDto.
+     */
     public static function fromArray(array $data): self
     {
         return new self(
@@ -26,6 +32,11 @@ class ProductsPageDto
         );
     }
 
+    /**
+     * Serializa la página a un arreglo asociativo con la lista de productos como sub-arreglos.
+     *
+     * @return array Arreglo con metadatos de paginación y lista de productos.
+     */
     public function toArray(): array
     {
         return [

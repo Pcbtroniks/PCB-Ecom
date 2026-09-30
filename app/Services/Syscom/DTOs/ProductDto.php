@@ -18,6 +18,12 @@ class ProductDto
         public readonly PriceDto $precios,
     ) {}
 
+    /**
+     * Construye un ProductDto desde un arreglo asociativo de la API Syscom.
+     *
+     * @param  array  $data  Arreglo con claves del producto y `categorias` (lista de CategoryDto) y `precios`.
+     * @return self DTO con todos los campos normalizados.
+     */
     public static function fromArray(array $data): self
     {
         $categorias = array_map(
@@ -40,6 +46,11 @@ class ProductDto
         );
     }
 
+    /**
+     * Serializa el DTO a un arreglo asociativo, incluyendo categorías y precios como sub-arreglos.
+     *
+     * @return array Arreglo completo del producto apto para JSON.
+     */
     public function toArray(): array
     {
         return [
